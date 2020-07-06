@@ -1,0 +1,9 @@
+[submodule "nanogui"]
+	path = nanogui
+	url = https://github.com/wjakob/nanogui
+[submodule "json"]
+	path = json
+	url = https://github.com/nlohmann/json
+[submodule "lib_utils"]
+	path = lib_utils
+	url = https://github.com/cln515/lib_utils
