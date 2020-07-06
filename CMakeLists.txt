@@ -21,13 +21,21 @@ include_directories(
 	lib_utils
 )
 
-add_executable(${PROJECT_NAME} src/main.cpp
-src/functions.cpp
-lib_utils/basicPly/BasicPly.cpp
-lib_utils/image_utility/image_utility.cpp
-lib_utils/utility/utility.cpp
+add_executable(${PROJECT_NAME} 
+	src/main.cpp
+	src/functions.cpp
+	lib_utils/basicPly/BasicPly.cpp
+	lib_utils/image_utility/image_utility.cpp
+	lib_utils/utility/utility.cpp
+	lib_utils/PanoramaRenderer/PanoramaRenderer.cpp
 )
 
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+
+find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME}  ${OpenCV_LIBS})
 
 find_package(OpenGL REQUIRED)
 include_directories(${OPENGL_INCLUDE_DIRS})
@@ -41,3 +49,11 @@ include_directories(${NANOGUI_EXTRA_INCS})
 # Lastly, additional libraries may have been built for you.  In addition to linking
 # against NanoGUI, we need to link against those as well.
 target_link_libraries(${PROJECT_NAME} nanogui ${NANOGUI_EXTRA_LIBS})
+
+find_package(Ceres REQUIRED)
+
+if(Ceres_FOUND)
+include_directories(${CERES_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${CERES_LIBRARIES})
+endif(Ceres_FOUND)
+
