@@ -159,24 +159,31 @@ public:
 			vector<uchar> status;
 			vector<float> err;
 			vector<cv::Point2f> src, src2;
-			cv::Mat image_g;
+			cv::Mat image_g, pano_cp,cam_cp; pano_cp = pano.clone();
 			cv::cvtColor(pano, image_g, CV_RGB2GRAY);
 			cv::goodFeaturesToTrack(image_g, src, 0, 1e-5, minDistance, cv::noArray(), 3, true);
 			for (auto itr = src.begin(); itr != src.end(); itr++) {
-				cv::circle(pano, *itr, 1, cv::Scalar(255, 0, 0, 255));
+				cv::circle(pano_cp, *itr, 2, cv::Scalar(255, 0, 0, 255));
+			}
+			for (auto itr = panorama_pt.begin(); itr != panorama_pt.end(); itr++) {
+				cv::circle(pano_cp, *itr, 2, cv::Scalar(0, 255, 0, 255));
 			}
 			imageView->keypoints = src;
-			genGLTextureFromCvMat(pano, 0);
+			genGLTextureFromCvMat(pano_cp, 0);
 			imageView->nanogui::ImageView::bindImage(mTextureId[0]);
 
 			cv::cvtColor(cam, image_g, CV_RGB2GRAY);
 			cv::goodFeaturesToTrack(image_g, src2, 0, 1e-5, minDistance, cv::noArray(), 3, true);
+			cam_cp = cam.clone();
 			for (auto itr = src2.begin(); itr != src2.end(); itr++) {
-				cv::circle(cam, *itr, 1, cv::Scalar(255, 0, 0, 255));
+				cv::circle(cam_cp, *itr, 2, cv::Scalar(255, 0, 0, 255));
+			}
+			for (auto itr = camera_pt.begin(); itr != camera_pt.end(); itr++) {
+				cv::circle(cam_cp, *itr, 2, cv::Scalar(0, 255, 0, 255));
 			}
 
 			imageView2->keypoints = src2;
-			genGLTextureFromCvMat(cam, 1);
+			genGLTextureFromCvMat(cam_cp, 1);
 			imageView2->nanogui::ImageView::bindImage(mTextureId[1]);
 		});
 
@@ -190,6 +197,7 @@ public:
 				cam = cv::imread(dialogResult);
 				genGLTextureFromCvMat(cam, 1);
 				imageView2->bindImage(mTextureId[1]);
+				cameraImage = dialogResult;
 			}
 		});
 
@@ -231,8 +239,14 @@ public:
 
 				double worldPos[10][6];
 				double cameraPos[10][6];
-				worldPos[0][0] = worldPos[0][1] = worldPos[0][2]= worldPos[0][3]= worldPos[0][4]= worldPos[0][5] = 0;
-				cameraPos[0][2] = M_PI;
+				for (int x = 0; x < 10; x++) {
+					for (int y = 0; y < 6; y++) {
+						worldPos[x][y] = 0;
+						cameraPos[x][y] = 0;
+					}
+					cameraPos[x][2] = M_PI;
+				}
+				
 				while (true) {
 					if (project["match"]["0-"+std::to_string(pos)]["fp_pano"].is_null())break;
 					for (int camid = 0; camid < camnum; camid++) {
@@ -275,11 +289,14 @@ public:
 				options.linear_solver_type = ceres::DENSE_QR;
 				ceres::Solver::Summary summary;
 				ceres::Solve(options, &problem, &summary);
+				std::cout << summary.FullReport() << std::endl;
 				_6dof resmot = { cameraPos[0][0],cameraPos[0][1],cameraPos[0][2],cameraPos[0][3],cameraPos[0][4],cameraPos[0][5] };
 				_6dof resmot_ = { worldPos[0][0],worldPos[0][1],worldPos[0][2],worldPos[0][3],worldPos[0][4],worldPos[0][5] };
+				_6dof resmot2_ = { worldPos[1][0],worldPos[1][1],worldPos[1][2],worldPos[1][3],worldPos[1][4],worldPos[1][5] };
 				std::cout << resmot<< std::endl;
 				std::cout << _6dof2m(resmot) << std::endl;
 				std::cout << resmot_ << std::endl;
+				std::cout << resmot2_ << std::endl;
 
 			};
 		});
@@ -312,7 +329,7 @@ public:
 			}
 			matchdata["fp_pano"] = ptf;
 			matchdata["fp_cam"] = ptf2;
-
+			matchdata["filepath"]=cameraImage;
 			std::stringstream ss; ss << ib1->value() << "-" << ib2->value();
 			project["match"][ss.str()]=matchdata;
 		});
@@ -325,13 +342,22 @@ public:
 			std::stringstream ss; ss << ib1->value() << "-" << ib2->value();
 			ptf = project["match"][ss.str()]["fp_pano"].get<std::vector<float>>();
 			ptf2 = project["match"][ss.str()]["fp_cam"].get<std::vector<float>>();
+
 			panorama_pt.clear();
 			camera_pt.clear();
 			for (int i = 0; i < ptf.size()/2; i++) {
 				panorama_pt.push_back(cv::Point2f(ptf.at(i*2), ptf.at(i * 2 + 1)));
+				std::cout << cv::Point2f(ptf.at(i * 2), ptf.at(i * 2 + 1)) << std::endl;
 			}
 			for (int i = 0; i < ptf2.size() / 2; i++) {
 				camera_pt.push_back(cv::Point2f(ptf2.at(i * 2), ptf2.at(i * 2 + 1)));
+				std::cout << cv::Point2f(ptf2.at(i * 2), ptf2.at(i * 2 + 1)) << std::endl;
+			}
+			cameraImage = project["match"][ss.str()]["filepath"].is_null()?"":project["match"][ss.str()]["filepath"].get<std::string>();
+			cam = cv::imread(cameraImage);
+			if (cam.cols > 0) {
+				genGLTextureFromCvMat(cam, 1);
+				imageView2->bindImage(mTextureId[1]);
 			}
 		});
 
@@ -407,5 +433,5 @@ private:
 	imageViewClicker* imageView, *imageView2;
 	std::vector<cv::Point2f> panorama_pt;
 	std::vector<cv::Point2f> camera_pt;
-
+	std::string cameraImage;
 };
