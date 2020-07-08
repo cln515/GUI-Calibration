@@ -1,6 +1,10 @@
-cmake_minimum_required (VERSION 3.10)
-add_definitions("-Wall -std=c++11")
+cmake_minimum_required (VERSION 3.5)
+# add_definitions("-Wall -std=c++11")
 project(ManualCalibration)
+
+if(UNIX)
+set(CMAKE_CXX_FLAGS "-fpermissive -std=c++0x")
+endif()
 
 # Disable building extras we won't need (pure C++ project)
 set(NANOGUI_BUILD_EXAMPLE OFF CACHE BOOL " " FORCE)
