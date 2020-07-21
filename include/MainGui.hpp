@@ -270,13 +270,13 @@ public:
 								ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationCostFunc, ceres::CENTRAL, 2, 6, 6>(
 									new calibrationCostFunc(pix, v, lensParam[camid])
 									);
-								problem.AddResidualBlock(c, new ceres::CauchyLoss(0.1), worldPos[pos], cameraPos[camid - 1]);
+								problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos], cameraPos[camid - 1]);
 							}
 							else {
 								ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationAnchorCostFunc, ceres::CENTRAL, 2, 6>(
 									new calibrationAnchorCostFunc(pix, v, lensParam[camid])
 									);
-								problem.AddResidualBlock(c, new ceres::CauchyLoss(0.1), worldPos[pos]);
+								problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos]);
 							}
 						}
 					}
@@ -284,8 +284,8 @@ public:
 				}
 				ceres::Solver::Options options;
 				options.max_num_iterations = 1e4;
-				options.function_tolerance = 1e-7;
-				options.parameter_tolerance = 1e-7;
+				options.function_tolerance = 1e-18;
+				options.parameter_tolerance = 1e-18;
 				options.linear_solver_type = ceres::DENSE_QR;
 				ceres::Solver::Summary summary;
 				ceres::Solve(options, &problem, &summary);

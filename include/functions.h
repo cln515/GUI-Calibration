@@ -44,7 +44,7 @@ public:
 		Vector3d t2; t2 << x2, y2, z2;
 
 		//projection error
-		Vector3d plot = R2.transpose() *(R.transpose() * p - t) - t2;
+		Vector3d plot = R2.transpose() * (R.transpose() * (p - t) - t2);
 
 		double u, v;
 		FisheyeTransCV(plot(0), plot(1), plot(2), u, v, params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]);
@@ -83,7 +83,7 @@ public:
 
 
 		//projection error
-		Vector3d plot = R.transpose() * p  - t;
+		Vector3d plot = R.transpose() *( p  - t);
 
 		double u, v;
 		FisheyeTransCV(plot(0), plot(1), plot(2), u, v, params[0], params[1], params[2], params[3], params[4], params[5], params[6], params[7]);
