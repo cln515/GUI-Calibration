@@ -4,8 +4,8 @@
 #include <string>
 #include <Eigen/Core>
 #include <basicPly/BasicPly.h>
-#include <PanoramaRenderer/PanoramaRenderer.h>
 #include <opencv2/opencv.hpp>
+#include <PanoramaRenderer/PanoramaRenderer.h>
 
 void cvtPTX2panorama(std::string ptxFile, std::string colorOut, std::string depthOut);
 
