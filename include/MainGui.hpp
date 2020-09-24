@@ -214,22 +214,33 @@ public:
 			}
 		});
 
+
+
 		nanogui::Button *b9 = new nanogui::Button(tools, "Multi Camera Calibration");
 		b9->setCallback([&] {
 			if (!project["camera"].is_null()) {
 				nlohmann::json cameradat = project["camera"].get<nlohmann::json>();
 				int camnum = cameradat.size();
+				bool isCamera[5];
 				double lensParam[5][8];
+
+			
 				for (int camid = 0; camid < camnum; camid++) {
 					std::string camidstr = std::to_string(camid);
-					lensParam[camid][0] = cameradat[camidstr]["cx"];
-					lensParam[camid][1] = cameradat[camidstr]["cy"];
-					lensParam[camid][2] = cameradat[camidstr]["fx"];
-					lensParam[camid][3] = cameradat[camidstr]["fx"];
-					lensParam[camid][4] = cameradat[camidstr]["k1"];
-					lensParam[camid][5] = cameradat[camidstr]["k2"];
-					lensParam[camid][6] = cameradat[camidstr]["k3"];
-					lensParam[camid][7] = cameradat[camidstr]["k4"];
+					if (cameradat[camidstr]["lidar"].is_null()) {
+						lensParam[camid][0] = cameradat[camidstr]["cx"];
+						lensParam[camid][1] = cameradat[camidstr]["cy"];
+						lensParam[camid][2] = cameradat[camidstr]["fx"];
+						lensParam[camid][3] = cameradat[camidstr]["fx"];
+						lensParam[camid][4] = cameradat[camidstr]["k1"];
+						lensParam[camid][5] = cameradat[camidstr]["k2"];
+						lensParam[camid][6] = cameradat[camidstr]["k3"];
+						lensParam[camid][7] = cameradat[camidstr]["k4"];
+						isCamera[camid] = true;
+					}
+					else {
+						isCamera[camid] = false;
+					}
 				}
 
 				int pos = 0;
@@ -250,34 +261,48 @@ public:
 				while (true) {
 					if (project["match"]["0-"+std::to_string(pos)]["fp_pano"].is_null())break;
 					for (int camid = 0; camid < camnum; camid++) {
-						std::stringstream ss; ss << camid << "-" << pos;
-						
-						std::vector<float> panofp = project["match"][ss.str()]["fp_pano"].get<std::vector<float>>();
-						std::vector<float> camfp = project["match"][ss.str()]["fp_cam"].get<std::vector<float>>();
+						if (isCamera[camid] == true) {
+							std::stringstream ss; ss << camid << "-" << pos;
 
-						Vector3d v;
-						double d[8];
-						//Matrix3d rot = axisRot2R(0, 0, -M_PI / 2);
-						for (int j = 0; j < panofp.size()/2; j++) {
-							cv::Point2f p(panofp.at(j*2), panofp.at(j * 2 + 1));
-							rev_omniTrans(p.x, p.y, pano.cols, pano.rows, v);
-							getSubPixel_float(depth, p, d);
-							double dep = d[0] * d[1] + d[2] * d[3] + d[4] * d[5] + d[6] * d[7];
-							v = 50.0 * dep * v;
-							std::cout << v.transpose() << std::endl;
-							Vector2d pix; pix << camfp.at(j * 2), camfp.at(j * 2 + 1);
-							if (camid > 0) {
-								ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationCostFunc, ceres::CENTRAL, 2, 6, 6>(
-									new calibrationCostFunc(pix, v, lensParam[camid])
-									);
-								problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos], cameraPos[camid - 1]);
+							std::vector<float> panofp = project["match"][ss.str()]["fp_pano"].get<std::vector<float>>();
+							std::vector<float> camfp = project["match"][ss.str()]["fp_cam"].get<std::vector<float>>();
+
+							Vector3d v;
+							double d[8];
+							//Matrix3d rot = axisRot2R(0, 0, -M_PI / 2);
+							for (int j = 0; j < panofp.size() / 2; j++) {
+								cv::Point2f p(panofp.at(j * 2), panofp.at(j * 2 + 1));
+								rev_omniTrans(p.x, p.y, pano.cols, pano.rows, v);
+								getSubPixel_float(depth, p, d);
+								double dep = d[0] * d[1] + d[2] * d[3] + d[4] * d[5] + d[6] * d[7];
+								v = 50.0 * dep * v;
+								std::cout << v.transpose() << std::endl;
+								Vector2d pix; pix << camfp.at(j * 2), camfp.at(j * 2 + 1);
+								if (camid > 0) {
+									ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationCostFunc, ceres::CENTRAL, 2, 6, 6>(
+										new calibrationCostFunc(pix, v, lensParam[camid])
+										);
+									problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos], cameraPos[camid - 1]);
+								}
+								else {
+									ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationAnchorCostFunc, ceres::CENTRAL, 2, 6>(
+										new calibrationAnchorCostFunc(pix, v, lensParam[camid])
+										);
+									problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos]);
+								}
 							}
-							else {
-								ceres::CostFunction* c = new ceres::NumericDiffCostFunction < calibrationAnchorCostFunc, ceres::CENTRAL, 2, 6>(
-									new calibrationAnchorCostFunc(pix, v, lensParam[camid])
-									);
-								problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos]);
-							}
+						}
+						else {
+							std::stringstream ss; ss << camid << "-" << pos;
+							
+							std::string panofp = project["match"][ss.str()]["filepath"].get<std::string>();
+							std::cout << panofp <<std::endl;
+							Matrix4d m = getMatrixFlomPly(panofp);
+							ceres::CostFunction* c = new ceres::NumericDiffCostFunction < LiDARCost, ceres::CENTRAL, 7, 6, 6>(
+								new LiDARCost(m)
+								);
+							problem.AddResidualBlock(c, new ceres::CauchyLoss(1), worldPos[pos], cameraPos[camid - 1]);
+
 						}
 					}
 					pos++;
@@ -317,6 +342,19 @@ public:
 		nanogui::IntBox<int>* ib2 = new nanogui::IntBox<int>(window);
 		ib2->setEditable(true);
 
+		nanogui::Button *b11 = new nanogui::Button(window, "Open LiDAR Data");
+		b11->setCallback([&, ib1, ib2] {
+			std::string dialogResult = nanogui::file_dialog(
+				{ {"ply", "ply file"} }, false);
+			std::cout << "File dialog result: " << dialogResult << std::endl;
+			if (dialogResult.length() > 0) {
+				nlohmann::json matchdata;
+				matchdata["filepath"] = dialogResult;
+				std::stringstream ss; ss << ib1->value() << "-" << ib2->value();
+				project["match"][ss.str()] = matchdata;
+			}
+		});
+
 		nanogui::Button *b7 = new nanogui::Button(window, "Set Match");
 		b7->setCallback([&,ib1,ib2] {
 			nlohmann::json matchdata;
@@ -333,6 +371,9 @@ public:
 			std::stringstream ss; ss << ib1->value() << "-" << ib2->value();
 			project["match"][ss.str()]=matchdata;
 		});
+
+
+
 
 		nanogui::Button *b10 = new nanogui::Button(window, "Load Match");
 		b10->setCallback([&, ib1, ib2] {
